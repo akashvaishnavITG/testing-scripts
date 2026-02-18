@@ -1,0 +1,49 @@
+<script>
+      const BLOCKED_DOMAINS = ['googletagmanager.com/gtag/js', 'milky-mama.com/cdn/wpm'];
+
+      function shouldBlockWPM() {
+        const path = window.location.pathname;
+        const isHomePage = path === '/' || path === '/index' || path === '/index.html';
+        const isProductPage = path.startsWith('/products/');
+        return isHomePage || isProductPage;
+      }
+
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.tagName === 'SCRIPT') {
+              if (node.src && BLOCKED_DOMAINS.some((domain) => node.src.includes(domain))) {
+                node.remove();
+              } else if (!node.src && node.textContent.includes('gtag(')) {
+                node.remove();
+              }
+            }
+            if (node.id === 'web-pixels-manager-setup' && shouldBlockWPM()) {
+              node.remove();
+            }
+          }
+        }
+      });
+
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('script').forEach((script) => {
+          if (script.src && BLOCKED_DOMAINS.some((domain) => script.src.includes(domain))) {
+            script.remove();
+          } else if (!script.src && script.textContent.includes('gtag(')) {
+            script.remove();
+          }
+        });
+
+        if (shouldBlockWPM()) {
+          const webPixel = document.getElementById('web-pixels-manager-setup');
+          if (webPixel) {
+            webPixel.remove();
+          }
+        }
+      });
+    </script>
