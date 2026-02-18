@@ -1,0 +1,88 @@
+
+    {% comment %} speed optimize code {% endcomment %}
+
+       {% if template.name == 'index' %}
+        <script>
+      (function() {
+          window.__blockedScripts = [];
+          const originalScript = document.createElement;
+          document.createElement = function(tag) {
+              if (tag.toLowerCase() === "script") {
+                  const el = originalScript.call(document, tag);
+                  Object.defineProperty(el, "src", {
+                      set(v) {
+                          window.__blockedScripts.push(v);
+                      }
+                  });
+                  el.setAttribute = function(name, value) {
+                      if (name === "src") {
+                          window.__blockedScripts.push(value);
+                          return;
+                      }
+                      HTMLElement.prototype.setAttribute.call(this, name, value);
+                  };
+                  return el;
+              }
+              return originalScript.call(document, tag);
+          };
+          const blockAppend = function(orig) {
+              return function(node) {
+                  if (node.tagName === "SCRIPT") {
+                      const src = node.src || node.getAttribute("src");
+                      window.__blockedScripts.push(src);
+                      return null;
+                  }
+                  return orig.apply(this, arguments);
+              };
+          };
+          Element.prototype.appendChild = blockAppend(Element.prototype.appendChild);
+          Element.prototype.insertBefore = blockAppend(Element.prototype.insertBefore);
+      })();
+      </script>
+    {% endif %}
+      {% comment %} speed optimize code {% endcomment %}
+
+
+
+
+
+       --- below {{ content_for_header }}
+
+
+
+
+
+       {% comment %} speed optimize code  {% endcomment %}
+    {% if template.name == 'index' %}
+
+    <script>
+    (function() {
+        let loaded = false;
+        async function loadScripts() {
+            if (loaded) return;
+            loaded = true;
+            const list = window.__blockedScripts.filter(Boolean);
+            for (let src of list) {
+                await new Promise(resolve => {
+                    const s = document.createElement("script");
+                    s.src = src;
+                    const start = performance.now();
+                    s.onload = () => {
+                        const end = performance.now();
+                        resolve();
+                    };
+                    s.onerror = () => {
+                        resolve();
+                    };
+                    document.body.appendChild(s);
+                });
+            }
+        }
+        window.addEventListener("scroll", loadScripts, { once: true });
+    })();
+    </script>
+    {% endif %}
+{% comment %} speed optimize code  {% endcomment %}
+
+
+----- below --- body tag end

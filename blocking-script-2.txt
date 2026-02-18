@@ -1,0 +1,145 @@
+<script>
+      // Configuration
+      const BLOCKED_DOMAINS = [
+        'magnoliaboutique.com/cdn/shop/t/219/compiled_assets/scripts.js?47114',
+        'magnoliaboutique.com/cdn/shop/t/219/assets/localization-form.js',
+        'https://static.klaviyo.com/onsite/js/PC9FLB/klaviyo.js',
+        'https://sdk.justsell.live/latest.js',
+        'https://cdn.shopify.com/extensions/0199ac0f-12f7-7d8a-bb82-8ef148320ec9/smile-shopify-app-extensions-231/assets/smile-loader.js%27,
+      ];
+
+      // Store removed scripts for later reinsertion
+      const removedScripts = {
+        withSrc: [],
+        inline: [],
+        webPixels: [],
+      };
+
+      // Check if we should block Web Pixels Manager
+      function shouldBlockWPM() {
+        const path = window.location.pathname;
+        const isHomePage = path === '/' || path === '/index' || path === '/index.html';
+        const isProductPage = path.startsWith('/products/');
+        return isHomePage || isProductPage;
+      }
+
+      // Function to remove scripts initially
+      function blockScriptsInitially() {
+        document.querySelectorAll('script').forEach((script) => {
+          if (script.src && BLOCKED_DOMAINS.some((domain) => script.src.includes(domain))) {
+            // Store for later reinsertion
+            removedScripts.withSrc.push({
+              src: script.src,
+              async: script.async,
+              defer: script.defer,
+              type: script.type,
+            });
+            script.remove();
+          } else if (!script.src && script.textContent.includes('gtag(')) {
+            // Store inline scripts
+            removedScripts.inline.push(script.textContent);
+            script.remove();
+          }
+        });
+
+        // Block Web Pixels Manager if needed
+        if (shouldBlockWPM()) {
+          const webPixel = document.getElementById('web-pixels-manager-setup');
+          if (webPixel) {
+            removedScripts.webPixels.push(webPixel.outerHTML);
+            webPixel.remove();
+          }
+        }
+      }
+
+      // Function to reinsert scripts after page load
+      function reinsertScripts() {
+        console.log('Reinserting blocked scripts...');
+
+        // Reinsert scripts with src
+        removedScripts.withSrc.forEach((scriptData) => {
+          const newScript = document.createElement('script');
+          newScript.src = scriptData.src;
+          if (scriptData.async) newScript.async = scriptData.async;
+          if (scriptData.defer) newScript.defer = scriptData.defer;
+          if (scriptData.type) newScript.type = scriptData.type;
+          document.head.appendChild(newScript);
+        });
+
+        // Reinsert inline scripts
+        removedScripts.inline.forEach((scriptContent) => {
+          const newScript = document.createElement('script');
+          newScript.textContent = scriptContent;
+          document.head.appendChild(newScript);
+        });
+
+        // Reinsert Web Pixels Manager
+        removedScripts.webPixels.forEach((webPixelHTML) => {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = webPixelHTML;
+          document.body.appendChild(tempDiv.firstChild);
+        });
+
+        console.log('All scripts reinserted successfully');
+      }
+
+      // Mutation Observer to catch dynamically added scripts
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.tagName === 'SCRIPT') {
+              if (node.src && BLOCKED_DOMAINS.some((domain) => node.src.includes(domain))) {
+                // Store and remove
+                removedScripts.withSrc.push({
+                  src: node.src,
+                  async: node.async,
+                  defer: node.defer,
+                  type: node.type,
+                });
+                node.remove();
+              } else if (!node.src && node.textContent.includes('gtag(')) {
+                // Store and remove
+                removedScripts.inline.push(node.textContent);
+                node.remove();
+              }
+            }
+            if (node.id === 'web-pixels-manager-setup' && shouldBlockWPM()) {
+              // Store and remove
+              removedScripts.webPixels.push(node.outerHTML);
+              node.remove();
+            }
+          }
+        }
+      });
+
+      // Initialize script blocking
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+
+      // Block scripts on DOMContentLoaded
+      document.addEventListener('DOMContentLoaded', () => {
+        blockScriptsInitially();
+        console.log('Scripts blocked for initial load performance');
+      });
+
+      // Reinsert scripts when page is fully loaded
+      window.addEventListener('load', () => {
+        // Small delay to ensure everything is ready
+        setTimeout(() => {
+          reinsertScripts();
+          // Stop observing after reinsertion
+          observer.disconnect();
+        }, 100);
+      });
+
+      // Fallback: reinsert scripts if load event doesn't fire
+      setTimeout(() => {
+        if (removedScripts.withSrc.length > 0 || removedScripts.inline.length > 0) {
+          console.log('Fallback: Reinserting scripts after timeout');
+          reinsertScripts();
+          observer.disconnect();
+        }
+      }, 3000);
+    </script>
